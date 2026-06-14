@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учёт заработка</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Фоновые эффекты -->
+<canvas id="particleCanvas"></canvas>
+<div id="nebula"></div>
+
+<!-- ── Экран входа ── -->
+<div id="loginScreen">
+    <div class="login-form">
+        <div class="login-icon">⬡</div>
+        <h2>Вход в систему</h2>
+        <input type="password" id="accessKey" placeholder="Ключ доступа">
+        <button onclick="login()">Войти</button>
+        <div id="errorMsg" class="error"></div>
+    </div>
+</div>
+
+<!-- ── Основное приложение ── -->
+<div id="mainApp" style="display:none;">
+
+    <div class="header">
+        <h1>Учёт заработка</h1>
+        <button onclick="logout()">Выйти</button>
+    </div>
+
+    <div class="app-layout">
+
+        <!-- Левая колонка: форма -->
+        <div class="left-col">
+            <div class="panel" id="formPanel">
+                <h3>Новый отчёт</h3>
+
+                <div class="company-tabs">
+                    <button class="tab-btn active" onclick="selectCompany(this,'РЕД-СТАР')">РЕД-СТАР</button>
+                    <button class="tab-btn" onclick="selectCompany(this,'ФУД-ХАУС')">ФУД-ХАУС</button>
+                </div>
+                <input type="hidden" id="company" value="РЕД-СТАР">
+
+                <input type="text"   id="container" class="field" placeholder="Номер контейнера">
+                <input type="number" id="amount"    class="field" placeholder="Сумма">
+                <input type="number" id="cz"        class="field" placeholder="Честный знак (необязательно)">
+                <input type="date"   id="date"      class="field">
+
+                <div class="total-preview">
+                    <div class="total-label">Итоговая сумма</div>
+                    <div class="total-num"><strong id="totalPreview">0</strong> <span class="rub">₽</span></div>
+                </div>
+
+                <button class="btn-save" onclick="createReport()">Сохранить отчёт</button>
+                <div id="createMsg" class="save-msg"></div>
+            </div>
+        </div>
+
+        <!-- Правая колонка: статистика + отчёты -->
+        <div class="right-col">
+            <div class="panel" id="statsPanel">
+                <h3>Статистика</h3>
+                <div class="stat-grid" id="statGrid">
+                    <div class="stat-card"><div class="stat-n" id="statCount">—</div><div class="stat-l">Отчётов</div></div>
+                    <div class="stat-card"><div class="stat-n" id="statTotal">—</div><div class="stat-l">Итого</div></div>
+                    <div class="stat-card"><div class="stat-n" id="statContainers">—</div><div class="stat-l">Контейнеров</div></div>
+                    <div class="stat-card"><div class="stat-n" id="statAvg">—</div><div class="stat-l">Среднее</div></div>
+                </div>
+            </div>
+
+            <div class="panel reports-panel" id="reportsPanel">
+                <div id="reportsContent"><div class="empty">Загрузка...</div></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
