@@ -1,14 +1,13 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const crypto  = require('crypto');
-const app     = express();
-const PORT    = 3000;
+const Database = require('better-sqlite3');
+const crypto = require('crypto');
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 const SECRET_KEY = process.env.SECRET_KEY;
-const MAX_ATTEMPTS  = 2;       // попыток до блокировки
-const LOCKOUT_MS    = 30 * 60 * 1000; // 30 минут в мс
+const MAX_ATTEMPTS = 2;
+const LOCKOUT_MS = 30 * 60 * 1000;
 
-// Хранилище попыток: { ip -> { attempts, lockedUntil } }
 const loginAttempts = {};
 
 function getEntry(ip) {
@@ -17,11 +16,10 @@ function getEntry(ip) {
 }
 
 function checkAuth(req, res, next) {
-    const ip  = req.ip || req.connection.remoteAddress;
+    const ip = req.ip || req.connection.remoteAddress;
     const key = req.headers['x-access-key'] || '';
     const entry = getEntry(ip);
 
-    // Заблокирован?
     if (entry.lockedUntil && Date.now() < entry.lockedUntil) {
         const remaining = Math.ceil((entry.lockedUntil - Date.now()) / 60000);
         return res.status(429).json({
@@ -31,14 +29,11 @@ function checkAuth(req, res, next) {
         });
     }
 
-    // Сброс блокировки если время вышло
     if (entry.lockedUntil && Date.now() >= entry.lockedUntil) {
-        entry.attempts   = 0;
+        entry.attempts = 0;
         entry.lockedUntil = null;
     }
 
-    // Сравнение ключей через timingSafeEqual (защита от timing-атак)
-    // Padding до одинаковой длины чтобы timingSafeEqual не крашился
     const expected = Buffer.from(SECRET_KEY);
     const provided = Buffer.alloc(expected.length, 0);
     Buffer.from(key).copy(provided);
@@ -46,12 +41,11 @@ function checkAuth(req, res, next) {
                   crypto.timingSafeEqual(expected, provided);
 
     if (valid) {
-        entry.attempts  = 0;   // сброс при успехе
+        entry.attempts = 0;
         entry.lockedUntil = null;
         return next();
     }
 
-    // Неверный ключ
     entry.attempts += 1;
 
     if (entry.attempts >= MAX_ATTEMPTS) {
@@ -74,8 +68,9 @@ function checkAuth(req, res, next) {
 app.use(express.json());
 app.use(express.static('public'));
 
-const db = new sqlite3.Database('./database.db');
-db.run(`
+const db = new Database('./database.db');
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     container TEXT NOT NULL,
@@ -88,28 +83,33 @@ db.run(`
 `);
 
 app.get('/api/reports', checkAuth, (req, res) => {
-    db.all('SELECT * FROM reports ORDER BY date DESC', (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
+    try {
+        const rows = db.prepare('SELECT * FROM reports ORDER BY date DESC').all();
         res.json(rows);
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/reports', checkAuth, (req, res) => {
     const { container, amount, company, cz, date } = req.body;
-    if (!container || !amount || !company || !date)
+    if (!container || !amount || !company || !date) {
         return res.status(400).json({ error: 'Missing fields' });
+    }
 
     const created_at = new Date().toISOString();
-    const czValue    = (cz && cz > 0) ? cz : null;
+    const czValue = (cz && cz > 0) ? cz : null;
 
-    db.run(
-        'INSERT INTO reports (container, amount, company, cz, date, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [container, amount, company, czValue, date, created_at],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ id: this.lastID, success: true });
-        }
-    );
+    try {
+        const stmt = db.prepare(`
+            INSERT INTO reports (container, amount, company, cz, date, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        const info = stmt.run(container, amount, company, czValue, date, created_at);
+        res.json({ id: info.lastInsertRowid, success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
