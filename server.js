@@ -8,52 +8,60 @@ const SECRET_KEY = process.env.SECRET_KEY;
 const MAX_ATTEMPTS = 2;
 const LOCKOUT_MS = 30 * 60 * 1000;
 
-// Хранилище блокировок по КЛЮЧУ (не по IP)
-const keyAttempts = {};
+const loginAttempts = {};
+
+function getEntry(ip) {
+    if (!loginAttempts[ip]) loginAttempts[ip] = { attempts: 0, lockedUntil: null };
+    return loginAttempts[ip];
+}
 
 function checkAuth(req, res, next) {
+    const ip = req.ip || req.connection.remoteAddress;
     const key = req.headers['x-access-key'] || '';
-    
-    // Блокировка по ключу
-    const entry = keyAttempts[key] || { attempts: 0, lockedUntil: null };
-    
+    const entry = getEntry(ip);
+
     if (entry.lockedUntil && Date.now() < entry.lockedUntil) {
         const remaining = Math.ceil((entry.lockedUntil - Date.now()) / 60000);
         return res.status(429).json({
             error: 'Too many attempts',
-            message: `Ключ заблокирован. Попробуйте через ${remaining} мин.`
+            message: `Слишком много попыток. Попробуйте через ${remaining} мин.`,
+            lockedUntil: entry.lockedUntil
         });
     }
-    
+
     if (entry.lockedUntil && Date.now() >= entry.lockedUntil) {
-        delete keyAttempts[key];
+        entry.attempts = 0;
+        entry.lockedUntil = null;
     }
-    
-    // Проверка ключа
-    if (key === SECRET_KEY) {
-        delete keyAttempts[key];
+
+    const expected = Buffer.from(SECRET_KEY);
+    const provided = Buffer.alloc(expected.length, 0);
+    Buffer.from(key).copy(provided);
+    const valid = key.length === SECRET_KEY.length &&
+                  crypto.timingSafeEqual(expected, provided);
+
+    if (valid) {
+        entry.attempts = 0;
+        entry.lockedUntil = null;
         return next();
     }
-    
-    // Неверный ключ
-    if (!keyAttempts[key]) {
-        keyAttempts[key] = { attempts: 1, lockedUntil: null };
-    } else {
-        keyAttempts[key].attempts += 1;
-    }
-    
-    if (keyAttempts[key].attempts >= MAX_ATTEMPTS) {
-        keyAttempts[key].lockedUntil = Date.now() + LOCKOUT_MS;
+
+    entry.attempts += 1;
+
+    if (entry.attempts >= MAX_ATTEMPTS) {
+        entry.lockedUntil = Date.now() + LOCKOUT_MS;
         return res.status(429).json({
             error: 'Too many attempts',
-            message: 'Ключ заблокирован на 30 минут. Слишком много попыток.'
+            message: 'Слишком много попыток. Попробуйте через 30 мин.',
+            lockedUntil: entry.lockedUntil
         });
     }
-    
-    const left = MAX_ATTEMPTS - keyAttempts[key].attempts;
+
+    const left = MAX_ATTEMPTS - entry.attempts;
     return res.status(401).json({
         error: 'Unauthorized',
-        message: `Неверный ключ. Осталось попыток: ${left}`
+        message: `Неверный ключ. Осталось попыток: ${left}`,
+        attemptsLeft: left
     });
 }
 
