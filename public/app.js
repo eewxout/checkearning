@@ -56,7 +56,6 @@ function login() {
     const key = document.getElementById('accessKey').value.trim();
     if (!key) { showError('Введите ключ доступа'); return; }
 
-    // Проверяем локальную блокировку
     const lockedUntil = +localStorage.getItem('lockedUntil');
     if (lockedUntil && Date.now() < lockedUntil) {
         startCountdown(lockedUntil);
@@ -75,11 +74,9 @@ function login() {
                 document.getElementById('mainApp').style.display = 'block';
                 loadAll();
             } else if (status === 429) {
-                // Заблокированы
                 localStorage.setItem('lockedUntil', data.lockedUntil);
                 startCountdown(data.lockedUntil);
             } else {
-                // 401 — неверный ключ, показываем сколько осталось попыток
                 const msg = data.message || 'Неверный ключ доступа';
                 showError(msg);
             }
@@ -129,7 +126,6 @@ function logout() {
 window.onload = function () {
     document.getElementById('accessKey').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
 
-    // Восстанавливаем обратный отсчёт если страница перезагружена во время блокировки
     const lockedUntil = +localStorage.getItem('lockedUntil');
     if (lockedUntil && Date.now() < lockedUntil) {
         startCountdown(lockedUntil);
@@ -148,16 +144,6 @@ function selectCompany(btn, val) {
 }
 
 /* ══ Form ══ */
-(function initForm() {
-    // wait for DOM
-    document.addEventListener('DOMContentLoaded', () => {
-        ['amount','cz'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.addEventListener('input', updatePreview);
-        });
-    });
-})();
-
 function updatePreview() {
     const amount = parseFloat(document.getElementById('amount').value) || 0;
     const cz     = parseFloat(document.getElementById('cz').value)     || 0;
@@ -179,6 +165,7 @@ function resetForm() {
     const msg = document.getElementById('createMsg');   if (msg) msg.innerText = '';
 }
 
+/* ══ СОХРАНЕНИЕ ОТЧЁТА (ИСПРАВЛЕНО) ══ */
 function createReport() {
     const container = document.getElementById('container').value.trim();
     const amount    = parseFloat(document.getElementById('amount').value);
@@ -187,7 +174,12 @@ function createReport() {
     const date      = document.getElementById('date').value;
     const msgEl     = document.getElementById('createMsg');
 
-    if (!container || isNaN(amount) || !date) { msgEl.innerText = '⚠ Заполните обязательные поля'; return; }
+    if (!container || isNaN(amount) || !date) { 
+        msgEl.innerText = '⚠ Заполните обязательные поля'; 
+        msgEl.style.color = '#f87171';
+        return; 
+    }
+    
     const cz = czRaw !== '' ? parseFloat(czRaw) || null : null;
 
     fetch('/api/reports', {
@@ -198,15 +190,38 @@ function createReport() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            msgEl.innerText = '✓ Сохранено';
-            setTimeout(() => { resetForm(); loadAll(); }, 1400);
+            msgEl.innerText = '✓ Сохранено!';
+            msgEl.style.color = '#4ade80';
+            
+            // Очищаем форму
+            document.getElementById('container').value = '';
+            document.getElementById('amount').value = '';
+            document.getElementById('cz').value = '';
+            document.getElementById('date').value = '';
+            updatePreview(); // Сбрасываем preview
+            
+            // ОБНОВЛЯЕМ ДАННЫЕ НА СТРАНИЦЕ БЕЗ ПЕРЕЗАГРУЗКИ
+            loadAll();
+            
+            // Убираем сообщение через 2 секунды
+            setTimeout(() => {
+                msgEl.innerText = '';
+            }, 2000);
+        } else {
+            msgEl.innerText = '❌ Ошибка: ' + (data.error || 'Неизвестная ошибка');
+            msgEl.style.color = '#f87171';
         }
     })
-    .catch(() => { msgEl.innerText = 'Ошибка при сохранении'; });
+    .catch(() => { 
+        msgEl.innerText = '❌ Ошибка при сохранении';
+        msgEl.style.color = '#f87171';
+    });
 }
 
 /* ══ Load everything ══ */
 function loadAll() {
+    if (!currentKey) return;
+    
     fetch('/api/reports', { headers: { 'x-access-key': currentKey } })
         .then(r => r.json())
         .then(reports => {
@@ -220,7 +235,14 @@ function loadAll() {
 
 /* ══ Stats ══ */
 function renderStats(reports) {
-    if (!reports || !reports.length) return;
+    if (!reports || !reports.length) {
+        document.getElementById('statCount').innerText = '0';
+        document.getElementById('statTotal').innerHTML = '0 ₽';
+        document.getElementById('statContainers').innerText = '0';
+        document.getElementById('statAvg').innerHTML = '0 ₽';
+        return;
+    }
+    
     const total = reports.reduce((s,r) => s + r.amount + (r.cz ? r.cz*150 : 0), 0);
     const containers = new Set(reports.map(r => r.container)).size;
     const avg = total / reports.length;
@@ -307,11 +329,11 @@ function itemsHTML(items) {
 /* toggles */
 function toggleMonth(el) {
     const q = el.closest('.month-card').querySelector('.quarters');
-    q.style.display = q.style.display === 'flex' ? 'none' : 'flex';
+    if (q) q.style.display = q.style.display === 'flex' ? 'none' : 'flex';
 }
 function toggleQuarter(el) {
     const l = el.closest('.quarter').querySelector('.reports-list');
-    l.style.display = l.style.display === 'flex' ? 'none' : 'flex';
+    if (l) l.style.display = l.style.display === 'flex' ? 'none' : 'flex';
 }
 
 /* utils */
@@ -319,12 +341,12 @@ function fmt(n) {
     return n.toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function noun(n) {
-    if (n%100>=11&&n%100<=19) return 'отчётов';
+    if (n%100>=11 && n%100<=19) return 'отчётов';
     switch(n%10){ case 1: return 'отчёт'; case 2: case 3: case 4: return 'отчёта'; }
     return 'отчётов';
 }
 
-/* attach preview listeners after DOM ready */
+/* attach preview listeners */
 document.addEventListener('DOMContentLoaded', () => {
     const a = document.getElementById('amount');
     const c = document.getElementById('cz');
