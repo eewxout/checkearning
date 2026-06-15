@@ -156,16 +156,17 @@ function updatePreview() {
 }
 
 function resetForm() {
-    ['container','amount','cz','date'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
-    });
+    document.getElementById('container').value = '';
+    document.getElementById('amount').value = '';
+    document.getElementById('cz').value = '';
+    document.getElementById('date').value = '';
     document.getElementById('company').value = 'РЕД-СТАР';
     document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===0));
-    const tp = document.getElementById('totalPreview'); if (tp) tp.innerText = '0';
-    const msg = document.getElementById('createMsg');   if (msg) msg.innerText = '';
+    document.getElementById('totalPreview').innerText = '0';
+    document.getElementById('createMsg').innerText = '';
 }
 
-/* ══ СОХРАНЕНИЕ ОТЧЁТА - БЕЗ ПЕРЕЗАГРУЗКИ ══ */
+/* ══ СОХРАНЕНИЕ ОТЧЁТА ══ */
 function createReport() {
     const container = document.getElementById('container').value.trim();
     const amount    = parseFloat(document.getElementById('amount').value);
@@ -173,6 +174,13 @@ function createReport() {
     const czRaw     = document.getElementById('cz').value;
     const date      = document.getElementById('date').value;
     const msgEl     = document.getElementById('createMsg');
+
+    if (!currentKey) {
+        msgEl.innerText = '❌ Ошибка: не авторизован';
+        msgEl.style.color = '#f87171';
+        setTimeout(() => { msgEl.innerText = ''; }, 2000);
+        return;
+    }
 
     if (!container || isNaN(amount) || !date) { 
         msgEl.innerText = '⚠ Заполните обязательные поля'; 
@@ -194,11 +202,21 @@ function createReport() {
             msgEl.innerText = '✓ Отчёт сохранён!';
             msgEl.style.color = '#4ade80';
             
-            // Очищаем форму
+            // ОЧИЩАЕМ ПОЛЯ
             document.getElementById('container').value = '';
             document.getElementById('amount').value = '';
             document.getElementById('cz').value = '';
             document.getElementById('date').value = '';
+            document.getElementById('company').value = 'РЕД-СТАР';
+            
+            // Сбрасываем активную вкладку
+            const tabs = document.querySelectorAll('.tab-btn');
+            tabs.forEach((btn, i) => {
+                if (i === 0) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            
+            // Обновляем preview
             updatePreview();
             
             // ОБНОВЛЯЕМ ДАННЫЕ БЕЗ ПЕРЕЗАГРУЗКИ

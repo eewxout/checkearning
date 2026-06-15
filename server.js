@@ -94,7 +94,12 @@ async function initDatabase() {
 app.get('/api/reports', checkAuth, async (req, res) => {
     try {
         const result = await db.execute('SELECT * FROM reports ORDER BY date DESC');
-        res.json(result.rows);
+        // Преобразуем BigInt в Number для всех id
+        const rows = result.rows.map(row => ({
+            ...row,
+            id: Number(row.id)
+        }));
+        res.json(rows);
     } catch (err) {
         console.error('Ошибка GET:', err.message);
         res.status(500).json({ error: err.message });
@@ -119,7 +124,8 @@ app.post('/api/reports', checkAuth, async (req, res) => {
         });
         
         console.log(`✅ Добавлен отчёт: ${container}, ${amount}₽`);
-        res.json({ id: result.lastInsertRowid, success: true });
+        // Преобразуем BigInt в Number
+        res.json({ id: Number(result.lastInsertRowid), success: true });
     } catch (err) {
         console.error('Ошибка POST:', err.message);
         res.status(500).json({ error: err.message });
@@ -132,7 +138,7 @@ app.get('/api/status', async (req, res) => {
         res.json({ 
             status: 'ok', 
             database: 'Turso',
-            records: result.rows[0].count 
+            records: Number(result.rows[0].count)
         });
     } catch (err) {
         res.json({ status: 'error', message: err.message });
