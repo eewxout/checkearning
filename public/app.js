@@ -165,7 +165,7 @@ function resetForm() {
     const msg = document.getElementById('createMsg');   if (msg) msg.innerText = '';
 }
 
-/* ══ СОХРАНЕНИЕ ОТЧЁТА (ИСПРАВЛЕНО) ══ */
+/* ══ СОХРАНЕНИЕ ОТЧЁТА - БЕЗ ПЕРЕЗАГРУЗКИ ══ */
 function createReport() {
     const container = document.getElementById('container').value.trim();
     const amount    = parseFloat(document.getElementById('amount').value);
@@ -194,31 +194,23 @@ function createReport() {
             msgEl.innerText = '✓ Отчёт сохранён!';
             msgEl.style.color = '#4ade80';
             
-            // ОЧИЩАЕМ ВСЕ ПОЛЯ
+            // Очищаем форму
             document.getElementById('container').value = '';
             document.getElementById('amount').value = '';
             document.getElementById('cz').value = '';
             document.getElementById('date').value = '';
-            
-            // Сбрасываем компанию на РЕД-СТАР
-            document.getElementById('company').value = 'РЕД-СТАР';
-            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
-                if (i === 0) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
-            
-            // Обновляем preview
             updatePreview();
             
-            // ОБНОВЛЯЕМ ДАННЫЕ (список и статистику)
-            loadAll();
+            // ОБНОВЛЯЕМ ДАННЫЕ БЕЗ ПЕРЕЗАГРУЗКИ
+            fetch('/api/reports', { headers: { 'x-access-key': currentKey } })
+                .then(r => r.json())
+                .then(reports => {
+                    renderStats(reports);
+                    renderReports(reports);
+                })
+                .catch(err => console.error('Ошибка обновления:', err));
             
-            // Убираем сообщение через 2 секунды
-            setTimeout(() => {
-                if (msgEl.innerText === '✓ Отчёт сохранён!') {
-                    msgEl.innerText = '';
-                }
-            }, 2000);
+            setTimeout(() => { msgEl.innerText = ''; }, 2000);
         } else {
             msgEl.innerText = '❌ Ошибка: ' + (data.error || 'Неизвестная ошибка');
             msgEl.style.color = '#f87171';
@@ -227,7 +219,7 @@ function createReport() {
     })
     .catch((err) => { 
         console.error('Ошибка:', err);
-        msgEl.innerText = '❌ Ошибка соединения с сервером';
+        msgEl.innerText = '❌ Ошибка соединения';
         msgEl.style.color = '#f87171';
         setTimeout(() => { msgEl.innerText = ''; }, 3000);
     });
