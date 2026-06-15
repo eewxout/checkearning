@@ -134,4 +134,19 @@ try {
 // Автосохранение каждые 5 минут
 setInterval(backupDatabase, 5 * 60 * 1000);
 
+// Временная проверка (удалишь потом)
+app.get('/api/check', (req, res) => {
+    try {
+        const count = db.prepare('SELECT COUNT(*) as count FROM reports').get();
+        const sample = db.prepare('SELECT * FROM reports LIMIT 5').all();
+        res.json({ 
+            count: count.count, 
+            sample: sample,
+            backupExists: require('fs').existsSync('./database_dump.sql')
+        });
+    } catch(err) {
+        res.json({ error: err.message });
+    }
+});
+
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
