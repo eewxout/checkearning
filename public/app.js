@@ -253,19 +253,16 @@ function renderStats(reports) {
     if (!reports || !reports.length) {
         document.getElementById('statCount').innerText = '0';
         document.getElementById('statTotal').innerHTML = '0 ₽';
-        document.getElementById('statContainers').innerText = '0';
         document.getElementById('statAvg').innerHTML = '0 ₽';
         return;
     }
     
     const total = reports.reduce((s,r) => s + r.amount + (r.cz ? r.cz*150 : 0), 0);
-    const containers = new Set(reports.map(r => r.container)).size;
     const avg = total / reports.length;
 
-    document.getElementById('statCount').innerText      = reports.length;
-    document.getElementById('statTotal').innerHTML      = shortNum(total) + ' <span class="stat-rub">₽</span>';
-    document.getElementById('statContainers').innerText = containers;
-    document.getElementById('statAvg').innerHTML        = shortNum(avg) + ' <span class="stat-rub">₽</span>';
+    document.getElementById('statCount').innerText = reports.length;
+    document.getElementById('statTotal').innerHTML = shortNum(total) + ' <span class="stat-rub">₽</span>';
+    document.getElementById('statAvg').innerHTML = shortNum(avg) + ' <span class="stat-rub">₽</span>';
 }
 
 function shortNum(n) {
