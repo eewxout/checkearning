@@ -177,6 +177,7 @@ function createReport() {
     if (!container || isNaN(amount) || !date) { 
         msgEl.innerText = '⚠ Заполните обязательные поля'; 
         msgEl.style.color = '#f87171';
+        setTimeout(() => { msgEl.innerText = ''; }, 2000);
         return; 
     }
     
@@ -190,31 +191,45 @@ function createReport() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            msgEl.innerText = '✓ Сохранено!';
+            msgEl.innerText = '✓ Отчёт сохранён!';
             msgEl.style.color = '#4ade80';
             
-            // Очищаем форму
+            // ОЧИЩАЕМ ВСЕ ПОЛЯ
             document.getElementById('container').value = '';
             document.getElementById('amount').value = '';
             document.getElementById('cz').value = '';
             document.getElementById('date').value = '';
-            updatePreview(); // Сбрасываем preview
             
-            // ОБНОВЛЯЕМ ДАННЫЕ НА СТРАНИЦЕ БЕЗ ПЕРЕЗАГРУЗКИ
+            // Сбрасываем компанию на РЕД-СТАР
+            document.getElementById('company').value = 'РЕД-СТАР';
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                if (i === 0) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            
+            // Обновляем preview
+            updatePreview();
+            
+            // ОБНОВЛЯЕМ ДАННЫЕ (список и статистику)
             loadAll();
             
             // Убираем сообщение через 2 секунды
             setTimeout(() => {
-                msgEl.innerText = '';
+                if (msgEl.innerText === '✓ Отчёт сохранён!') {
+                    msgEl.innerText = '';
+                }
             }, 2000);
         } else {
             msgEl.innerText = '❌ Ошибка: ' + (data.error || 'Неизвестная ошибка');
             msgEl.style.color = '#f87171';
+            setTimeout(() => { msgEl.innerText = ''; }, 3000);
         }
     })
-    .catch(() => { 
-        msgEl.innerText = '❌ Ошибка при сохранении';
+    .catch((err) => { 
+        console.error('Ошибка:', err);
+        msgEl.innerText = '❌ Ошибка соединения с сервером';
         msgEl.style.color = '#f87171';
+        setTimeout(() => { msgEl.innerText = ''; }, 3000);
     });
 }
 
@@ -228,7 +243,8 @@ function loadAll() {
             renderStats(reports);
             renderReports(reports);
         })
-        .catch(() => {
+        .catch(err => {
+            console.error('Ошибка загрузки:', err);
             document.getElementById('reportsContent').innerHTML = '<div class="empty">Ошибка загрузки</div>';
         });
 }
