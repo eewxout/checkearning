@@ -1,3 +1,4 @@
+const fs = require('fs');
 const express = require('express');
 const Database = require('better-sqlite3');
 const crypto = require('crypto');
@@ -103,5 +104,34 @@ app.post('/api/reports', checkAuth, (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+// ===== АВТОСОХРАНЕНИЕ БД =====
+function backupDatabase() {
+    try {
+        const reports = db.prepare('SELECT * FROM reports').all();
+        if (reports.length > 0) {
+            let sql = `-- Backup ${new Date().toISOString()}\n`;
+            for (const r of reports) {
+                sql += `INSERT INTO reports (id, container, amount, company, cz, date, created_at) VALUES (${r.id}, '${r.container}', ${r.amount}, '${r.company}', ${r.cz || 'NULL'}, '${r.date}', '${r.created_at}');\n`;
+            }
+            fs.writeFileSync('./database_dump.sql', sql);
+            console.log('✅ Бэкап сохранён');
+        }
+    } catch(err) { console.log('Бэкап:', err.message); }
+}
+
+// Восстановление при запуске
+try {
+    if (fs.existsSync('./database_dump.sql')) {
+        const sql = fs.readFileSync('./database_dump.sql', 'utf8');
+        const commands = sql.split(';').filter(c => c.trim() && !c.includes('Backup'));
+        for (const cmd of commands) {
+            try { db.exec(cmd); } catch(e) {}
+        }
+        console.log('✅ Данные восстановлены');
+    }
+} catch(err) { console.log('Восстановление:', err.message); }
+
+// Автосохранение каждые 5 минут
+setInterval(backupDatabase, 5 * 60 * 1000);
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
