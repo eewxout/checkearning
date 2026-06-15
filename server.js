@@ -12,36 +12,11 @@ const LOCKOUT_MS = 30 * 60 * 1000;
 // Хранилище блокировок по ключу
 const keyAttempts = {};
 
-// Подключение к Turso (облачная SQLite)
+// Подключение к Turso
 const db = createClient({
     url: process.env.TURSO_URL,
     authToken: process.env.TURSO_TOKEN
 });
-
-// Создание таблицы при запуске (асинхронно)
-(async () => {
-    try {
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS reports (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                container TEXT NOT NULL,
-                amount REAL NOT NULL,
-                company TEXT NOT NULL,
-                cz REAL,
-                date TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-        `);
-        console.log('✅ Turso подключен, таблица готова');
-        
-        // Проверка сколько записей в БД
-        const result = await db.execute('SELECT COUNT(*) as count FROM reports');
-        console.log(`📊 В базе данных: ${result.rows[0].count} записей`);
-        
-    } catch (err) {
-        console.error('❌ Ошибка подключения к Turso:', err.message);
-    }
-})();
 
 // Middleware
 app.use(express.json());
@@ -91,9 +66,31 @@ function checkAuth(req, res, next) {
     });
 }
 
-// ===== API ENDPOINTS =====
+// Создание таблицы при запуске
+async function initDatabase() {
+    try {
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                container TEXT NOT NULL,
+                amount REAL NOT NULL,
+                company TEXT NOT NULL,
+                cz REAL,
+                date TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        `);
+        console.log('✅ Turso подключен, таблица готова');
+        
+        const result = await db.execute('SELECT COUNT(*) as count FROM reports');
+        console.log(`📊 В базе данных: ${result.rows[0].count} записей`);
+    } catch (err) {
+        console.error('❌ Ошибка Turso:', err.message);
+        process.exit(1);
+    }
+}
 
-// Получить все отчёты
+// API endpoints
 app.get('/api/reports', checkAuth, async (req, res) => {
     try {
         const result = await db.execute('SELECT * FROM reports ORDER BY date DESC');
@@ -104,7 +101,6 @@ app.get('/api/reports', checkAuth, async (req, res) => {
     }
 });
 
-// Добавить новый отчёт
 app.post('/api/reports', checkAuth, async (req, res) => {
     const { container, amount, company, cz, date } = req.body;
     
@@ -124,14 +120,12 @@ app.post('/api/reports', checkAuth, async (req, res) => {
         
         console.log(`✅ Добавлен отчёт: ${container}, ${amount}₽`);
         res.json({ id: result.lastInsertRowid, success: true });
-        
     } catch (err) {
         console.error('Ошибка POST:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Проверка статуса (для отладки)
 app.get('/api/status', async (req, res) => {
     try {
         const result = await db.execute('SELECT COUNT(*) as count FROM reports');
@@ -145,8 +139,12 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
-// Запуск сервера
-app.listen(PORT, () => {
-    console.log(`🚀 Сервер запущен на http://localhost:${PORT}`);
-    console.log(`📦 База данных: Turso (облачная SQLite)`);
-});
+// Запуск
+async function start() {
+    await initDatabase();
+    app.listen(PORT, () => {
+        console.log(`🚀 Сервер на http://localhost:${PORT}`);
+    });
+}
+
+start();
