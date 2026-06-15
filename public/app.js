@@ -175,13 +175,6 @@ function createReport() {
     const date      = document.getElementById('date').value;
     const msgEl     = document.getElementById('createMsg');
 
-    if (!currentKey) {
-        msgEl.innerText = '❌ Ошибка: не авторизован';
-        msgEl.style.color = '#f87171';
-        setTimeout(() => { msgEl.innerText = ''; }, 2000);
-        return;
-    }
-
     if (!container || isNaN(amount) || !date) { 
         msgEl.innerText = '⚠ Заполните обязательные поля'; 
         msgEl.style.color = '#f87171';
@@ -200,26 +193,22 @@ function createReport() {
     .then(data => {
         if (data.success) {
             msgEl.innerText = '✓ Отчёт сохранён!';
-            msgEl.style.color = '#4ade80';
+            msgEl.style.color = '#98e0c0';
             
-            // ОЧИЩАЕМ ПОЛЯ
             document.getElementById('container').value = '';
             document.getElementById('amount').value = '';
             document.getElementById('cz').value = '';
             document.getElementById('date').value = '';
             document.getElementById('company').value = 'РЕД-СТАР';
             
-            // Сбрасываем активную вкладку
             const tabs = document.querySelectorAll('.tab-btn');
             tabs.forEach((btn, i) => {
                 if (i === 0) btn.classList.add('active');
                 else btn.classList.remove('active');
             });
             
-            // Обновляем preview
             updatePreview();
             
-            // ОБНОВЛЯЕМ ДАННЫЕ БЕЗ ПЕРЕЗАГРУЗКИ
             fetch('/api/reports', { headers: { 'x-access-key': currentKey } })
                 .then(r => r.json())
                 .then(reports => {
